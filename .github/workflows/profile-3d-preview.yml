@@ -2,30 +2,52 @@ name: GitHub-Profile-3D-Contrib
 
 on:
   schedule:
-    - cron: "0 18 * * *"  # Se ejecuta todos los días a las 18:00 UTC
-  workflow_dispatch:       # Permite ejecutarlo manualmente
+    # 08:17 UTC = 03:17 a. m. en Colombia
+    - cron: "17 8 * * *"
+
+  # Permite ejecutarlo manualmente desde Actions
+  workflow_dispatch:
 
 permissions:
-  contents: write          # Permite hacer commits en tu repo
+  contents: write
+
+concurrency:
+  group: profile-3d-contrib
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
     name: generate-3d-profile
-    steps:
-      - uses: actions/checkout@v4
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
-      - name: Generate 3D Contribution Graph
-        uses: yoshi389111/github-profile-3d-contrib@latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Generate 3D contribution graph
+        uses: yoshi389111/github-profile-3d-contrib@v0.9.2
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_PAT }}   # Usa tu token personal
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USERNAME: ${{ github.repository_owner }}
 
-      - name: Commit & Push
+      # Cambia una vez al mes para evitar 60 días sin actividad.
+      # El commit pertenece al bot, no a tu usuario.
+      - name: Update workflow heartbeat
+        run: |
+          date -u +"%Y-%m" > .github/profile-3d-heartbeat
+
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git commit -m "generated 3D profile"; then
-            git push
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add profile-3d-contrib .github/profile-3d-heartbeat
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
           fi
+
+          git commit -m "chore: update 3D contribution graph"
+          git push
